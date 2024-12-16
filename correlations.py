@@ -4,15 +4,9 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from scipy.ndimage import uniform_filter1d
 
-# Pour afficher les graphiques directement dans Colab
-%matplotlib inline
 
 # Étape 1 : Charger les données depuis le fichier CSV
 data = pd.read_csv("DF_EVOL_TENSE_FLORIAN.csv")
-
-# Afficher les premières lignes pour vérifier
-print("Aperçu des données :")
-print(data.head())
 
 # Étape 2 : Prétraitement des données
 # Convertir la colonne 'date' en format datetime
