@@ -8,7 +8,6 @@ from sklearn.preprocessing import StandardScaler
 from matplotlib.lines import Line2D
 import warnings
 
-%matplotlib inline
 warnings.filterwarnings('ignore')
 
 # Load the dataset
