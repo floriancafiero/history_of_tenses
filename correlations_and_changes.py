@@ -8,60 +8,50 @@ from sklearn.preprocessing import StandardScaler
 from matplotlib.lines import Line2D
 import warnings
 
+sns.set_theme(style="whitegrid")
+%matplotlib inline
 warnings.filterwarnings('ignore')
 
-# Load the dataset
+# Charger le jeu de données
 data = pd.read_csv("DF_EVOL_TENSE_FLORIAN.csv")
-print("Data Preview:")
+print("Aperçu des données :")
 print(data.head())
 
-# Convert 'date' to datetime format and extract 'Year'
+# Convertir 'date' au format datetime et extraire 'Year'
 data['date'] = pd.to_datetime(data['date'], errors='coerce')
 data['Year'] = data['date'].dt.year
 
-# Drop rows with invalid dates
+# Supprimer les lignes avec des dates invalides
 missing_years = data['Year'].isnull().sum()
 if missing_years > 0:
-    print(f"\nWarning: {missing_years} entries have invalid dates and will be removed.")
+    print(f"\nAttention : {missing_years} entrées ont des dates invalides et seront supprimées.")
     data = data.dropna(subset=['Year'])
 
 data['Year'] = data['Year'].astype(int)
-print("\nAvailable Years in Data:", sorted(data['Year'].unique()))
+print("\nAnnées disponibles dans les données :", sorted(data['Year'].unique()))
 
-# Define verb tense columns and their English translations
+# Définir les colonnes des temps verbaux
 verb_tenses = ['Présent', 'Imparfait', 'Passé simple', 'Passé composé', 'Futur', 'Plus que parfait']
 for tense in verb_tenses:
     if tense not in data.columns:
-        raise ValueError(f"Column '{tense}' is missing from the data.")
+        raise ValueError(f"La colonne '{tense}' est manquante dans les données.")
 
-tense_translations = {
-    'Présent': 'Present',
-    'Imparfait': 'Imperfect',
-    'Passé simple': 'Simple Past',
-    'Passé composé': 'Past Perfect',
-    'Futur': 'Future',
-    'Plus que parfait': 'Pluperfect'
-}
-
-# Compute and plot correlation matrix
+# Calculer et tracer la matrice de corrélation
 correlation_matrix = data[verb_tenses].corr()
-correlation_matrix_english = correlation_matrix.rename(columns=tense_translations, index=tense_translations)
 
 plt.figure(figsize=(10, 8))
-sns.heatmap(correlation_matrix_english, annot=True, cmap='coolwarm', fmt=".2f", linewidths=0.5)
-plt.title("Correlation Matrix Between Verb Tenses", fontsize=16)
+sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', fmt=".2f", linewidths=0.5)
 plt.xticks(rotation=45, ha='right', fontsize=12)
 plt.yticks(rotation=0, fontsize=12)
 plt.tight_layout()
 plt.show()
 
-# Calculate yearly correlations
-yearly_corr = pd.DataFrame()
-yearly_corr['Year'] = sorted(data['Year'].unique())
+# Calculer les corrélations annuelles
+yearly_corr = pd.DataFrame({'Year': sorted(data['Year'].unique())})
 
 for tense in verb_tenses:
     if tense != 'Passé simple':
-        yearly_corr[tense_translations[tense]] = np.nan
+        yearly_corr[tense] = np.nan
 
 for year in yearly_corr['Year']:
     df_year = data[data['Year'] == year]
@@ -72,102 +62,89 @@ for year in yearly_corr['Year']:
             corr = df_year['Passé simple'].corr(df_year[tense])
         else:
             corr = np.nan
-        yearly_corr.loc[yearly_corr['Year'] == year, tense_translations[tense]] = corr
+        yearly_corr.loc[yearly_corr['Year'] == year, tense] = corr
 
-print("\nYearly Correlations Before Smoothing:")
+print("\nCorrélations annuelles avant lissage :")
 print(yearly_corr.head())
 
-# Apply increased smoothing
+# Appliquer un lissage
 window_size = 7
-for tense in tense_translations.values():
-    if tense == 'Simple Past':
+for tense in verb_tenses:
+    if tense == 'Passé simple':
         continue
     yearly_corr[tense] = uniform_filter1d(yearly_corr[tense].fillna(0), size=window_size)
 
-print("\nYearly Correlations After Smoothing:")
+print("\nCorrélations annuelles après lissage :")
 print(yearly_corr.head())
 
-# Rename correlation columns to include '_corr'
-for tense in verb_tenses:
-    if tense != 'Passé simple':
-        english_tense = tense_translations[tense]
-        yearly_corr.rename(columns={english_tense: f'{english_tense}_corr'}, inplace=True)
-
-# Define color groups
+# Définir les groupes de couleurs
 group1_colors = sns.color_palette("Blues", n_colors=3)
 group2_colors = sns.color_palette("Oranges", n_colors=3)
 
-group1 = ['Past Perfect', 'Present', 'Future']
-group2 = ['Imperfect', 'Simple Past' , 'Pluperfect']
+group1 = ['Passé composé', 'Présent', 'Futur']
+group2 = ['Imparfait', 'Passé simple', 'Plus que parfait']
 
-color_mapping = {}
-for tense, color in zip(group1, group1_colors):
-    color_mapping[tense] = color
-for tense, color in zip(group2, group2_colors):
-    color_mapping[tense] = color
+color_mapping = {tense: color for tense, color in zip(group1 + group2, group1_colors + group2_colors)}
 
-# Define enhanced plotting function
-def plot_smoothed_correlations(data, tenses, color_mapping, title):
+# Fonction de traçage des corrélations lissées
+def plot_smoothed_correlations(data, tenses, color_mapping, title=""):
     plt.figure(figsize=(14, 8))
     for tense in tenses:
-        english_tense = tense
-        perc_col = f'{english_tense}_corr'
+        perc_col = tense
         if perc_col not in data.columns:
             continue
         plt.plot(
             data['Year'],
             data[perc_col],
-            label=english_tense,
-            color=color_mapping.get(english_tense, 'gray'),
+            label=tense,
+            color=color_mapping.get(tense, 'gray'),
             linewidth=2,
             alpha=0.7
         )
-    plt.title(title, fontsize=16)
-    plt.xlabel("Year", fontsize=14)
-    plt.ylabel("Correlation Coefficient", fontsize=14)
+    plt.xlabel("Année", fontsize=14)
+    plt.ylabel("Coefficient de corrélation", fontsize=14)
     plt.grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.7)
     plt.xticks(fontsize=12)
     plt.yticks(fontsize=12)
-    plt.legend(title="Verb Tenses", fontsize=12, title_fontsize=14, loc='best')
+    plt.legend(title="Temps verbaux", fontsize=12, title_fontsize=14, loc='best')
     plt.tight_layout()
     plt.show()
 
-# Plot smoothed correlations
+# Tracer les corrélations lissées
 plot_smoothed_correlations(
     data=yearly_corr,
     tenses=group1 + group2,
     color_mapping=color_mapping,
-    title="Smoothed Evolution of Correlations Between 'Simple Past' and Other Verb Tenses"
+    title=""
 )
 
-# Aggregate data by year and calculate percentages
+# Agréger les données par année et calculer les pourcentages
 aggregated_data = data.groupby('Year')[verb_tenses].sum().reset_index()
 aggregated_data['Total'] = aggregated_data[verb_tenses].sum(axis=1)
 
 zero_total_years = aggregated_data[aggregated_data['Total'] == 0]
 if not zero_total_years.empty:
-    print(f"\nWarning: {len(zero_total_years)} years have a total usage of zero and will be removed.")
+    print(f"\nAttention : {len(zero_total_years)} années ont un usage total de zéro et seront supprimées.")
     aggregated_data = aggregated_data[aggregated_data['Total'] != 0]
 
 for tense in verb_tenses:
-    english_tense = tense_translations[tense]
-    aggregated_data[f'{english_tense}_perc'] = (aggregated_data[tense] / aggregated_data['Total']) * 100
+    aggregated_data[f'{tense}_perc'] = (aggregated_data[tense] / aggregated_data['Total']) * 100
 
-percentage_columns = [f'{tense_translations[tense]}_perc' for tense in verb_tenses]
+percentage_columns = [f'{tense}_perc' for tense in verb_tenses]
 aggregated_data.dropna(subset=percentage_columns, inplace=True)
 
-print("\nPercentage Usage of Verb Tenses per Year:")
+print("\nPourcentage d'utilisation des temps verbaux par année :")
 print(aggregated_data.head())
 
-# Define verb groups
-group1 = ['Simple Past', 'Imperfect', 'Pluperfect']
-group2 = ['Present', 'Future', 'Past Perfect']
+# Définir les groupes de verbes
+group1 = ['Passé simple', 'Imparfait', 'Plus que parfait']
+group2 = ['Présent', 'Futur', 'Passé composé']
 
-# Create percentage columns for each group
+# Créer les colonnes de pourcentage pour chaque groupe
 group1_perc = [f'{tense}_perc' for tense in group1]
 group2_perc = [f'{tense}_perc' for tense in group2]
 
-# Function to detect anomalies using Isolation Forest
+# Fonction pour détecter les anomalies avec Isolation Forest
 def detect_anomalies_isolation_forest(series, contamination=0.01, random_state=42):
     data_model = series.values.reshape(-1, 1)
     scaler = StandardScaler()
@@ -178,32 +155,22 @@ def detect_anomalies_isolation_forest(series, contamination=0.01, random_state=4
     anomalies = np.where(preds == -1)[0]
     return anomalies
 
-# Detect anomalies
-anomalies_group1 = {}
-anomalies_group2 = {}
+# Détecter les anomalies
+anomalies_group1 = {tense: detect_anomalies_isolation_forest(aggregated_data[f'{tense}_perc']) for tense in group1}
+anomalies_group2 = {tense: detect_anomalies_isolation_forest(aggregated_data[f'{tense}_perc']) for tense in group2}
 
-for tense in group1:
-    perc_col = f'{tense}_perc'
-    anomalies = detect_anomalies_isolation_forest(aggregated_data[perc_col], contamination=0.01)
-    anomalies_group1[tense] = anomalies
-
-for tense in group2:
-    perc_col = f'{tense}_perc'
-    anomalies = detect_anomalies_isolation_forest(aggregated_data[perc_col], contamination=0.01)
-    anomalies_group2[tense] = anomalies
-
-print("\nDetected Anomalies for Group 1:")
+print("\nAnomalies détectées pour le Groupe 1 :")
 for tense, anomalies in anomalies_group1.items():
     anomaly_years = aggregated_data['Year'].iloc[anomalies].tolist()
-    print(f"{tense}: {len(anomalies)} anomalies at years {anomaly_years}")
+    print(f"{tense} : {len(anomalies)} anomalies aux années {anomaly_years}")
 
-print("\nDetected Anomalies for Group 2:")
+print("\nAnomalies détectées pour le Groupe 2 :")
 for tense, anomalies in anomalies_group2.items():
     anomaly_years = aggregated_data['Year'].iloc[anomalies].tolist()
-    print(f"{tense}: {len(anomalies)} anomalies at years {anomaly_years}")
+    print(f"{tense} : {len(anomalies)} anomalies aux années {anomaly_years}")
 
-# Enhanced plotting function for usage with anomalies
-def plot_usage_with_anomalies_fixed(data, tenses, anomalies_dict, title):
+# Fonction de traçage des usages avec anomalies
+def plot_usage_with_anomalies(data, tenses, anomalies_dict, title=""):
     plt.figure(figsize=(14, 8))
     for tense in tenses:
         perc_col = f'{tense}_perc'
@@ -213,30 +180,31 @@ def plot_usage_with_anomalies_fixed(data, tenses, anomalies_dict, title):
             anomaly_years = data['Year'].iloc[anomalies]
             anomaly_values = data[perc_col].iloc[anomalies]
             plt.scatter(anomaly_years, anomaly_values, color=line.get_color(), marker='o', s=100, label='_nolegend_')
-    anomaly_marker = Line2D([0], [0], marker='o', color='w', label='Anomaly',
+    # Ajouter un marqueur pour les anomalies dans la légende
+    anomaly_marker = Line2D([0], [0], marker='o', color='w', label='Anomalie',
                             markerfacecolor='black', markersize=10)
     handles, labels = plt.gca().get_legend_handles_labels()
     handles.append(anomaly_marker)
-    labels.append('Anomaly')
-    plt.legend(handles, labels, title="Verb Tenses and Anomalies", loc='upper right')
-    plt.title(title, fontsize=16)
-    plt.xlabel("Year", fontsize=14)
-    plt.ylabel("Usage Percentage (%)", fontsize=14)
+    labels.append('Anomalie')
+    plt.legend(handles, labels, title="Anomalies", loc='upper right')
+    plt.title(title, fontsize=16, fontweight='bold')
+    plt.xlabel("Année", fontsize=14)
+    plt.ylabel("Pourcentage d'utilisation (%)", fontsize=14)
     plt.grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.7)
     plt.tight_layout()
     plt.show()
 
-# Plot usage percentages with anomalies
-plot_usage_with_anomalies_fixed(
+# Tracer les pourcentages d'utilisation avec anomalies
+plot_usage_with_anomalies(
     data=aggregated_data,
     tenses=group1,
     anomalies_dict=anomalies_group1,
-    title="Usage Percentage of Verb Tenses: Simple Past, Imperfect, Pluperfect with Anomalies"
+    title=""
 )
 
-plot_usage_with_anomalies_fixed(
+plot_usage_with_anomalies(
     data=aggregated_data,
     tenses=group2,
     anomalies_dict=anomalies_group2,
-    title="Usage Percentage of Verb Tenses: Present, Future, Past Perfect with Anomalies"
+    title=""
 )
