@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from statsmodels.tsa.seasonal import seasonal_decompose
 
 # Load the data
-file_path = 'DF_EVOL_TENSE_FLORIAN.csv'  # Replace with your uploaded file path in Colab
+file_path = 'DF_EVOL_TENSE_FLORIAN.csv' 
 data = pd.read_csv(file_path)
 
 # Preprocess the data
